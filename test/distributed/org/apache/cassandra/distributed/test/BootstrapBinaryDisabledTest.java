@@ -119,7 +119,7 @@ public class BootstrapBinaryDisabledTest extends TestBaseImpl
             assertLogHas(node, "Leaving write survey mode and joining ring at operator request");
         }
 
-        node.logs().watchFor("Starting listening for CQL clients");
+        //node.logs().watchFor("Starting listening for CQL clients");
         assertBootstrapState(node, "COMPLETED");
     }
 

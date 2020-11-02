@@ -33,11 +33,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.DatagramChannel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Slf4JLoggerFactory;
@@ -56,10 +61,6 @@ import org.apache.cassandra.transport.messages.PrepareMessage;
 import org.apache.cassandra.transport.messages.QueryMessage;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.transport.messages.StartupMessage;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPipeline;
 import org.apache.cassandra.utils.ChecksumType;
 
 public class SimpleClient implements Closeable
@@ -164,7 +165,8 @@ public class SimpleClient implements Closeable
         // Configure the client.
         bootstrap = new Bootstrap()
                     .group(new NioEventLoopGroup())
-                    .channel(io.netty.channel.socket.nio.NioSocketChannel.class)
+                    .channel(io.netty.channel.socket.nio.NioDatagramChannel.class)
+					//.option(ChannelOption.SO_BROADCAST, true)
                     .option(ChannelOption.TCP_NODELAY, true);
 
         // Configure the pipeline factory.
@@ -276,9 +278,9 @@ public class SimpleClient implements Closeable
         }
     }
 
-    private class Initializer extends ChannelInitializer<Channel>
+    private class Initializer extends ChannelInitializer<DatagramChannel>
     {
-        protected void initChannel(Channel channel) throws Exception
+        protected void initChannel(DatagramChannel channel) throws Exception
         {
             connection = new Connection(channel, version, tracker);
             channel.attr(Connection.attributeKey).set(connection);
@@ -299,7 +301,7 @@ public class SimpleClient implements Closeable
 
     private class SecureInitializer extends Initializer
     {
-        protected void initChannel(Channel channel) throws Exception
+        protected void initChannel(DatagramChannel channel) throws Exception
         {
             super.initChannel(channel);
             SslContext sslContext = SSLFactory.getOrCreateSslContext(encryptionOptions, encryptionOptions.require_client_auth,

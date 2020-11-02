@@ -23,14 +23,13 @@ import java.net.SocketAddress;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
-
 import javax.net.ssl.SSLSession;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.bootstrap.ServerBootstrap;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -40,7 +39,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.group.ChannelGroup;
-import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.DatagramChannel;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
@@ -54,11 +53,13 @@ import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.streaming.async.StreamingInboundHandler;
 import org.apache.cassandra.utils.memory.BufferPools;
 
-import static java.lang.Math.*;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.cassandra.net.MessagingService.*;
+import static org.apache.cassandra.net.MessagingService.VERSION_30;
 import static org.apache.cassandra.net.MessagingService.VERSION_40;
 import static org.apache.cassandra.net.MessagingService.current_version;
+import static org.apache.cassandra.net.MessagingService.instance;
 import static org.apache.cassandra.net.MessagingService.minimum_version;
 import static org.apache.cassandra.net.SocketFactory.WIRETRACE;
 import static org.apache.cassandra.net.SocketFactory.encryptionLogStatement;
@@ -68,7 +69,7 @@ public class InboundConnectionInitiator
 {
     private static final Logger logger = LoggerFactory.getLogger(InboundConnectionInitiator.class);
 
-    private static class Initializer extends ChannelInitializer<SocketChannel>
+    private static class Initializer extends ChannelInitializer<DatagramChannel>
     {
         private final InboundConnectionSettings settings;
         private final ChannelGroup channelGroup;
@@ -83,14 +84,15 @@ public class InboundConnectionInitiator
         }
 
         @Override
-        public void initChannel(SocketChannel channel) throws Exception
+        public void initChannel(DatagramChannel channel) throws Exception
         {
             channelGroup.add(channel);
 
             channel.config().setOption(ChannelOption.ALLOCATOR, GlobalBufferPoolAllocator.instance);
-            channel.config().setOption(ChannelOption.SO_KEEPALIVE, true);
+            //channel.config().setOption(ChannelOption.SO_KEEPALIVE, true);
             channel.config().setOption(ChannelOption.SO_REUSEADDR, true);
-            channel.config().setOption(ChannelOption.TCP_NODELAY, true); // we only send handshake messages; no point ever delaying
+            //channel.config().setOption(ChannelOption.TCP_NODELAY, true); // we only send handshake messages; no point ever delaying
+			//channel.config().setOption(ChannelOption.SO_BROADCAST, true);
 
             ChannelPipeline pipeline = channel.pipeline();
 
@@ -114,7 +116,7 @@ public class InboundConnectionInitiator
             if (WIRETRACE)
                 pipeline.addLast("logger", new LoggingHandler(LogLevel.INFO));
 
-            channel.pipeline().addLast("handshake", new Handler(settings));
+            //channel.pipeline().addLast("handshake", new Handler(settings));
 
         }
     }
@@ -127,21 +129,26 @@ public class InboundConnectionInitiator
     {
         logger.info("Listening on {}", initializer.settings);
 
-        ServerBootstrap bootstrap = initializer.settings.socketFactory
+        Bootstrap bootstrap = initializer.settings.socketFactory
                                     .newServerBootstrap()
-                                    .option(ChannelOption.SO_BACKLOG, 1 << 9)
+                                    //.option(ChannelOption.SO_BACKLOG, 1 << 9)
                                     .option(ChannelOption.ALLOCATOR, GlobalBufferPoolAllocator.instance)
                                     .option(ChannelOption.SO_REUSEADDR, true)
-                                    .childHandler(initializer);
+                                    //.option(ChannelOption.SO_BROADCAST, true)
+                                    .handler(initializer);
 
         int socketReceiveBufferSizeInBytes = initializer.settings.socketReceiveBufferSizeInBytes;
         if (socketReceiveBufferSizeInBytes > 0)
-            bootstrap.childOption(ChannelOption.SO_RCVBUF, socketReceiveBufferSizeInBytes);
+            bootstrap.option(ChannelOption.SO_RCVBUF, socketReceiveBufferSizeInBytes);
 
         InetAddressAndPort bind = initializer.settings.bindAddress;
         ChannelFuture channelFuture = bootstrap.bind(new InetSocketAddress(bind.address, bind.port));
 
-        if (!channelFuture.awaitUninterruptibly().isSuccess())
+        if (channelFuture.awaitUninterruptibly().isSuccess())
+        {
+            logger.info("Channel bound to {}!", bind);
+        }
+        else
         {
             if (channelFuture.channel().isOpen())
                 channelFuture.channel().close();

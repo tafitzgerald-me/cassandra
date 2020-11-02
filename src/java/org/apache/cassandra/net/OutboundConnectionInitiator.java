@@ -37,9 +37,8 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoop;
-import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.DatagramChannel;
 import io.netty.handler.codec.ByteToMessageDecoder;
-
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
@@ -56,15 +55,19 @@ import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.memory.BufferPools;
 
-import static java.util.concurrent.TimeUnit.*;
-import static org.apache.cassandra.net.MessagingService.VERSION_40;
-import static org.apache.cassandra.net.HandshakeProtocol.*;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.cassandra.net.ConnectionType.STREAMING;
+import static org.apache.cassandra.net.HandshakeProtocol.Accept;
+import static org.apache.cassandra.net.HandshakeProtocol.ConfirmOutboundPre40;
+import static org.apache.cassandra.net.HandshakeProtocol.TIMEOUT_MILLIS;
+import static org.apache.cassandra.net.MessagingService.VERSION_40;
 import static org.apache.cassandra.net.OutboundConnectionInitiator.Result.incompatible;
 import static org.apache.cassandra.net.OutboundConnectionInitiator.Result.messagingSuccess;
 import static org.apache.cassandra.net.OutboundConnectionInitiator.Result.retry;
 import static org.apache.cassandra.net.OutboundConnectionInitiator.Result.streamingSuccess;
-import static org.apache.cassandra.net.SocketFactory.*;
+import static org.apache.cassandra.net.SocketFactory.WIRETRACE;
+import static org.apache.cassandra.net.SocketFactory.isCausedByConnectionReset;
+import static org.apache.cassandra.net.SocketFactory.newSslHandler;
 
 /**
  * A {@link ChannelHandler} to execute the send-side of the internode handshake protocol.
@@ -173,11 +176,12 @@ public class OutboundConnectionInitiator<SuccessType extends OutboundConnectionI
     {
         Bootstrap bootstrap = settings.socketFactory
                                       .newClientBootstrap(eventLoop, settings.tcpUserTimeoutInMS)
+                                      //.option(ChannelOption.SO_BROADCAST, true)
                                       .option(ChannelOption.ALLOCATOR, GlobalBufferPoolAllocator.instance)
                                       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.tcpConnectTimeoutInMS)
-                                      .option(ChannelOption.SO_KEEPALIVE, true)
+                                      //.option(ChannelOption.SO_KEEPALIVE, true)
                                       .option(ChannelOption.SO_REUSEADDR, true)
-                                      .option(ChannelOption.TCP_NODELAY, settings.tcpNoDelay)
+                                      //.option(ChannelOption.TCP_NODELAY, settings.tcpNoDelay)
                                       .option(ChannelOption.MESSAGE_SIZE_ESTIMATOR, NoSizeEstimator.instance)
                                       .handler(new Initializer());
 
@@ -189,9 +193,9 @@ public class OutboundConnectionInitiator<SuccessType extends OutboundConnectionI
         return bootstrap;
     }
 
-    private class Initializer extends ChannelInitializer<SocketChannel>
+    private class Initializer extends ChannelInitializer<DatagramChannel>
     {
-        public void initChannel(SocketChannel channel) throws Exception
+        public void initChannel(DatagramChannel channel) throws Exception
         {
             ChannelPipeline pipeline = channel.pipeline();
 
@@ -211,7 +215,7 @@ public class OutboundConnectionInitiator<SuccessType extends OutboundConnectionI
             if (WIRETRACE)
                 pipeline.addLast("logger", new LoggingHandler(LogLevel.INFO));
 
-            pipeline.addLast("handshake", new Handler());
+            //pipeline.addLast("handshake", new Handler());
         }
 
     }

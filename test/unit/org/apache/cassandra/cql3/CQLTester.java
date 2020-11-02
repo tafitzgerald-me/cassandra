@@ -24,7 +24,7 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.ServerSocket;
+import java.net.DatagramSocket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.rmi.server.RMISocketFactory;
@@ -182,7 +182,7 @@ public abstract class CQLTester
 
         try
         {
-            try (ServerSocket serverSocket = new ServerSocket(0))
+            try (DatagramSocket serverSocket = new DatagramSocket(0))
             {
                 nativePort = serverSocket.getLocalPort();
             }
@@ -267,7 +267,7 @@ public abstract class CQLTester
 
         InetAddress loopback = InetAddress.getLoopbackAddress();
         jmxHost = loopback.getHostAddress();
-        try (ServerSocket sock = new ServerSocket())
+        try (DatagramSocket sock = new DatagramSocket())
         {
             sock.bind(new InetSocketAddress(loopback, 0));
             jmxPort = sock.getLocalPort();

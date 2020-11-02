@@ -277,8 +277,8 @@ public class ToolRunner
         return new ToolResult(Arrays.asList(args),
                               res.left,
                               res.right.getExitCode() == -1 ? -1 : res.left.getRc(),
-                              res.right.getStdout() + res.left.getStdout(),
-                              res.right.getStderr() + res.left.getStderr(),
+                              res.right.getStdout() + res.left.getCommandAndArgs(),
+                              res.right.getStderr() + res.left.getError(),
                               res.right.getException());
     }
 

@@ -21,11 +21,14 @@
 package org.apache.cassandra.utils;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.SocketException;
 import java.rmi.server.RMIServerSocketFactory;
 import javax.net.ServerSocketFactory;
+
+import org.apache.commons.net.DefaultDatagramSocketFactory;
 
 public class RMIServerSocketFactoryImpl implements RMIServerSocketFactory
 {
@@ -42,6 +45,21 @@ public class RMIServerSocketFactoryImpl implements RMIServerSocketFactory
         ServerSocket socket = ServerSocketFactory.getDefault().createServerSocket(pPort, 0, bindAddress);
         try
         {
+            socket.setReuseAddress(true);
+            return socket;
+        }
+        catch (SocketException e)
+        {
+            socket.close();
+            throw e;
+        }
+    }
+
+    public DatagramSocket createDatagramSocket(final int pPort) throws IOException
+    {
+        DefaultDatagramSocketFactory factory = new DefaultDatagramSocketFactory();
+        DatagramSocket socket = factory.createDatagramSocket(pPort, bindAddress);
+        try {
             socket.setReuseAddress(true);
             return socket;
         }

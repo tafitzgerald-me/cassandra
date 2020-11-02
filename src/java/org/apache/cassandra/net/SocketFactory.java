@@ -37,20 +37,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.DefaultSelectStrategyFactory;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.EpollChannelOption;
+import io.netty.channel.epoll.EpollDatagramChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerSocketChannel;
-import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.unix.Errors;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
@@ -111,15 +107,15 @@ public final class SocketFactory
             }
 
             @Override
-            ChannelFactory<NioSocketChannel> clientChannelFactory()
+            ChannelFactory<NioDatagramChannel> clientChannelFactory()
             {
-                return NioSocketChannel::new;
+                return NioDatagramChannel::new;
             }
 
             @Override
-            ChannelFactory<NioServerSocketChannel> serverChannelFactory()
+            ChannelFactory<NioDatagramChannel> serverChannelFactory()
             {
-                return NioServerSocketChannel::new;
+                return NioDatagramChannel::new;
             }
         },
         EPOLL
@@ -136,15 +132,15 @@ public final class SocketFactory
             }
 
             @Override
-            ChannelFactory<EpollSocketChannel> clientChannelFactory()
+            ChannelFactory<EpollDatagramChannel> clientChannelFactory()
             {
-                return EpollSocketChannel::new;
+                return EpollDatagramChannel::new;
             }
 
             @Override
-            ChannelFactory<EpollServerSocketChannel> serverChannelFactory()
+            ChannelFactory<EpollDatagramChannel> serverChannelFactory()
             {
-                return EpollServerSocketChannel::new;
+                return EpollDatagramChannel::new;
             }
         };
 
@@ -156,7 +152,7 @@ public final class SocketFactory
 
         abstract EventLoopGroup makeEventLoopGroup(int threadCount, ThreadFactory threadFactory);
         abstract ChannelFactory<? extends Channel> clientChannelFactory();
-        abstract ChannelFactory<? extends ServerChannel> serverChannelFactory();
+        abstract ChannelFactory<? extends Channel> serverChannelFactory();
 
         static Provider optimalProvider()
         {
@@ -201,13 +197,14 @@ public final class SocketFactory
 
         if (provider == Provider.EPOLL)
             bootstrap.option(EpollChannelOption.TCP_USER_TIMEOUT, tcpUserTimeoutInMS);
+            //bootstrap.option(EpollChannelOption.SO_BROADCAST, true);
 
         return bootstrap;
     }
 
-    ServerBootstrap newServerBootstrap()
+    Bootstrap newServerBootstrap()
     {
-        return new ServerBootstrap().group(acceptGroup, defaultGroup).channelFactory(provider.serverChannelFactory());
+        return new Bootstrap().group(acceptGroup).channelFactory(provider.serverChannelFactory());
     }
 
     /**

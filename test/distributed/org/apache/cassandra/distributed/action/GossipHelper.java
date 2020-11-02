@@ -113,7 +113,7 @@ public class GossipHelper
                                                              peer.config().getString("partitioner")),
                                         unsafeReleaseVersion(target,
                                                              peer.config().getString("partitioner"),
-                                                             peer.getReleaseVersionString())));
+                                                             peer.schemaVersion().toString())));
     }
 
     public static InstanceAction statusToLeaving(IInvokableInstance newNode)
@@ -296,7 +296,7 @@ public class GossipHelper
 
     public static VersionedApplicationState releaseVersion(IInvokableInstance instance)
     {
-        return unsafeReleaseVersion(instance, instance.config().getString("partitioner"), instance.getReleaseVersionString());
+        return unsafeReleaseVersion(instance, instance.config().getString("partitioner"), instance.schemaVersion().toString());
     }
 
     public static VersionedApplicationState statusNormal(IInvokableInstance instance)

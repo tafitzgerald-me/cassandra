@@ -278,7 +278,7 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
                 delegate.receiveMessage(message);
         }
 
-        @Override
+        /* @Override
         public boolean getLogsEnabled()
         {
             return delegate().getLogsEnabled();
@@ -288,7 +288,7 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
         public LogAction logs()
         {
             return delegate().logs();
-        }
+        } */
 
         @Override
         public synchronized void setVersion(Versions.Version version)
@@ -330,7 +330,7 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
         this.initialVersion = builder.getVersion();
         this.filters = new MessageFilters();
         this.instanceInitializer = builder.getInstanceInitializer();
-        this.datadirCount = builder.getDatadirCount();
+        this.datadirCount = builder.getNodeCount();
 
         int generation = GENERATION.incrementAndGet();
         for (int i = 0; i < builder.getNodeCount(); ++i)
@@ -756,7 +756,6 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
             uncaughtExceptions.add(error);
     }
 
-    @Override
     public void setUncaughtExceptionsFilter(BiPredicate<Integer, Throwable> ignoreUncaughtThrowable)
     {
         this.ignoreUncaughtThrowable = ignoreUncaughtThrowable;
@@ -783,7 +782,6 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
         //withThreadLeakCheck(futures);
     }
 
-    @Override
     public void checkAndResetUncaughtExceptions()
     {
         List<Throwable> drain = new ArrayList<>(uncaughtExceptions.size());

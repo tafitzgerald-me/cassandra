@@ -19,7 +19,7 @@
 package org.apache.cassandra.net;
 
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.net.DatagramSocket;
 
 import com.google.common.base.Throwables;
 
@@ -27,11 +27,11 @@ public class SocketUtils
 {
     public static synchronized int findAvailablePort() throws RuntimeException
     {
-        ServerSocket ss = null;
+        DatagramSocket ss = null;
         try
         {
             // let the system pick an ephemeral port
-            ss = new ServerSocket(0);
+            ss = new DatagramSocket(0);
             ss.setReuseAddress(true);
             return ss.getLocalPort();
         }
@@ -43,14 +43,7 @@ public class SocketUtils
         {
             if (ss != null)
             {
-                try
-                {
-                    ss.close();
-                }
-                catch (IOException e)
-                {
-                    Throwables.propagate(e);
-                }
+                ss.close();
             }
         }
     }

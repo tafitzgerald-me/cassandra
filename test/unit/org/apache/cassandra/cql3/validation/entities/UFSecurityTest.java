@@ -83,8 +83,8 @@ public class UFSecurityTest extends CQLTester
                                           "} catch (Exception t) {" +
                                           "     throw new RuntimeException(t);" +
                                           '}'},
-        {"java.nio.channels.SocketChannel", "try {" +
-                                            "     java.nio.channels.SocketChannel.open().close(); return 0d;" +
+        {"java.nio.channels.DatagramChannel", "try {" +
+                                            "     java.nio.channels.DatagramChannel.open().close(); return 0d;" +
                                             "} catch (Exception t) {" +
                                             "     throw new RuntimeException(t);" +
                                             '}'},
@@ -156,7 +156,7 @@ public class UFSecurityTest extends CQLTester
         "new java.io.FileOutputStream(\"/tmp/foo\"); 0;",
         "java.nio.file.FileSystems.getDefault().createFileExclusively(\"./foo_bar_baz\"); 0;",
         "java.nio.channels.FileChannel.open(java.nio.file.FileSystems.getDefault().getPath(\"/etc/passwd\")); 0;",
-        "java.nio.channels.SocketChannel.open(); 0;",
+        "java.nio.channels.DatagramChannel.open(); 0;",
         "new java.net.ServerSocket().bind(null); 0;",
         "var thread = new java.lang.Thread(); thread.start(); 0;",
         "java.lang.System.getProperty(\"foo.bar.baz\"); 0;",

@@ -159,13 +159,11 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
         StreamingInboundHandler.trackInboundHandlers();
     }
 
-    @Override
     public boolean getLogsEnabled()
     {
         return true;
     }
 
-    @Override
     public LogAction logs()
     {
         // the path used is defined by test/conf/logback-dtest.xml and looks like the following
@@ -364,7 +362,6 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
         MessagingService.instance().versions.set(toCassandraInetAddressAndPort(endpoint), version);
     }
 
-    @Override
     public String getReleaseVersionString()
     {
         return callsOnInstance(() -> FBUtilities.getReleaseVersionString()).call();
@@ -613,9 +610,7 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
                 int rc = nodetool.execute(commandAndArgs);
                 return new NodeToolResult(commandAndArgs, rc,
                                           new ArrayList<>(nodetool.notifications.notifications),
-                                          nodetool.latestError,
-                                          output.getOutString(),
-                                          output.getErrString());
+                                          nodetool.latestError);
             }
         }).call();
     }

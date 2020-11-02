@@ -21,10 +21,15 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,16 +38,22 @@ import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.Snapshot;
-import io.netty.bootstrap.ServerBootstrap;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollDatagramChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
@@ -63,7 +74,10 @@ import org.apache.cassandra.net.ResourceLimits;
 import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.SchemaChangeListener;
 import org.apache.cassandra.security.SSLFactory;
-import org.apache.cassandra.service.*;
+import org.apache.cassandra.service.CassandraDaemon;
+import org.apache.cassandra.service.IEndpointLifecycleSubscriber;
+import org.apache.cassandra.service.NativeTransportService;
+import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.transport.messages.EventMessage;
 import org.apache.cassandra.utils.FBUtilities;
 
@@ -130,14 +144,15 @@ public class Server implements CassandraDaemon.Server
             return;
 
         // Configure the server.
-        ServerBootstrap bootstrap = new ServerBootstrap()
-                                    .channel(useEpoll ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
-                                    .childOption(ChannelOption.TCP_NODELAY, true)
-                                    .childOption(ChannelOption.SO_LINGER, 0)
-                                    .childOption(ChannelOption.SO_KEEPALIVE, DatabaseDescriptor.getRpcKeepAlive())
-                                    .childOption(ChannelOption.ALLOCATOR, CBUtil.allocator)
-                                    .childOption(ChannelOption.WRITE_BUFFER_HIGH_WATER_MARK, 32 * 1024)
-                                    .childOption(ChannelOption.WRITE_BUFFER_LOW_WATER_MARK, 8 * 1024);
+        Bootstrap bootstrap = new Bootstrap()
+                .channel(useEpoll ? EpollDatagramChannel.class : NioDatagramChannel.class)
+                //.option(ChannelOption.SO_BROADCAST, true)
+                //.option(ChannelOption.TCP_NODELAY, true)
+                //.option(ChannelOption.SO_LINGER, 0)
+                //.option(ChannelOption.SO_KEEPALIVE, DatabaseDescriptor.getRpcKeepAlive())
+                .option(ChannelOption.ALLOCATOR, CBUtil.allocator)
+                .option(ChannelOption.WRITE_BUFFER_HIGH_WATER_MARK, 32 * 1024)
+                .option(ChannelOption.WRITE_BUFFER_LOW_WATER_MARK, 8 * 1024);
         if (workerGroup != null)
             bootstrap = bootstrap.group(workerGroup);
 
@@ -148,17 +163,17 @@ public class Server implements CassandraDaemon.Server
             if (clientEnc.optional)
             {
                 logger.info("Enabling optionally encrypted CQL connections between client and server");
-                bootstrap.childHandler(new OptionalSecureInitializer(this, clientEnc));
+                bootstrap.handler(new OptionalSecureInitializer(this, clientEnc));
             }
             else
             {
                 logger.info("Enabling encrypted CQL connections between client and server");
-                bootstrap.childHandler(new SecureInitializer(this, clientEnc));
+                bootstrap.handler(new SecureInitializer(this, clientEnc));
             }
         }
         else
         {
-            bootstrap.childHandler(new Initializer(this));
+            bootstrap.handler(new Initializer(this));
         }
 
         // Bind and start to accept incoming connections.
@@ -168,7 +183,9 @@ public class Server implements CassandraDaemon.Server
         ChannelFuture bindFuture = bootstrap.bind(socket);
         if (!bindFuture.awaitUninterruptibly().isSuccess())
             throw new IllegalStateException(String.format("Failed to bind port %d on %s.", socket.getPort(), socket.getAddress().getHostAddress()),
-                                            bindFuture.cause());
+                    bindFuture.cause());
+        else
+            logger.info("Successfully binded channel to socket: {}", socket);
 
         connectionTracker.allChannels.add(bindFuture.channel());
         isRunning.set(true);
@@ -502,6 +519,9 @@ public class Server implements CassandraDaemon.Server
 
             pipeline.addLast("messageDecoder", messageDecoder);
             pipeline.addLast("messageEncoder", messageEncoder);
+
+            logger.info("-------------------------------------------- channel local address: {} / remote address: {}",
+                        channel.remoteAddress(), channel.remoteAddress());
 
             pipeline.addLast("executor", new Message.Dispatcher(DatabaseDescriptor.useNativeTransportLegacyFlusher(),
                                                                 EndpointPayloadTracker.get(((InetSocketAddress) channel.remoteAddress()).getAddress())));
